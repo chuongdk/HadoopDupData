@@ -40,6 +40,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
  
+
 import org.apache.hadoop.mapreduce.lib.input.*;
 
 
@@ -54,11 +55,42 @@ public class App extends Configured implements Tool {
 	final long DEFAULT_DATA_SIZE = 2 * 1024 * 1024;  // size of a data block
 	final long DEFAULT_CANDIDATE_SIZE = 2  * 1024 * 1024; // size of a candidate block   
 	
-   
+
+	Configuration setupConf(String[] args) throws IOException {
+		Configuration conf = new Configuration();
+		conf.set("input", args[0]);  // input location
+		conf.setInt("duplication", Integer.valueOf(args[1]));  // number of duplication
+		conf.set("output", args[2]);  // output location		
+		return conf;
+	}
+
+ 
+	private Path getOutputPath(Configuration conf) {
+		String sep = System.getProperty("file.separator");
+		return new Path(conf.get("output"));
+	}
+ 
+	private Path getInputPath(Configuration conf) {
+		return new Path(conf.get("input"));
+	}	
+	
+	Job setupJob(Configuration conf) throws Exception {
+		Job job = Job.getInstance(conf, "Duplicate data");
+		job.setJarByClass(App.class);
+		job.setMapperClass(MapDuplicate.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(Text.class);
+		FileInputFormat.addInputPath(job, getInputPath(conf));
+		FileOutputFormat.setOutputPath(job, getOutputPath(conf));// output path for iteration 1 is: output/1
 		
+		return job;
+	}
 	
 	public int run(String[] args) throws Exception {
-	
+		Configuration conf = setupConf(args);
+		Job job = setupJob(conf);			 
+		job.waitForCompletion(true);	
+		
 		return 1;
 	}
 		
@@ -71,6 +103,7 @@ public class App extends Configured implements Tool {
 		
 		System.out.println("input : " + args[0]);
 		System.out.println("duplication : " + args[1]);
+		System.out.println("output : " + args[2]);
 		// output = input + "/" + duplication
 		
 		System.out.println("Total time : " + (endTime - beginTime)/1000 + " seconds.");		

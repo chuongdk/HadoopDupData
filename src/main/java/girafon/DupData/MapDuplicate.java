@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
@@ -15,7 +16,7 @@ import org.apache.hadoop.mapreduce.Mapper.Context;
 
 // read a block of data, output n x blocks
 public class MapDuplicate 
-	extends Mapper<Object, Text, Text, Text>{
+	extends Mapper<Object, Text, NullWritable, Text>{
 	
  
  
@@ -23,10 +24,9 @@ public class MapDuplicate
 	private int dup = 1;
 	List<List<Integer>> data = new  ArrayList<List<Integer>>();
 	List<List<Integer>> dataDup;
-
-	// for each items, we save the frequency.
-	HashMap<Integer, Integer> items = new HashMap<Integer, Integer>();  
+	private long count = 0; // total number of items in the data 
 	
+ 
 	 @Override
 	protected void setup(Context context) throws IOException, InterruptedException {
 		 dup = context.getConfiguration().getInt("duplication", 1);
@@ -39,48 +39,62 @@ public class MapDuplicate
 		 List<Integer> t = new ArrayList<Integer>();
 		 for (String s : parts)
 			 t.add(Integer.valueOf(s));
-		
-		 // update frequency of items in tranaction t
-		 for (Integer x : t) {
-			 if (items.containsKey(x)) {
-				 Integer v = items.get(x) + 1;
-				 items.put(x, v);
-			 }
-			 else
-				 items.put(x, 1);
-		 }
+		 
+		 count += t.size();
 		 data.add(t);
+		 
 	 }
 	 
 	 public void generateTransaction(Context context) throws IOException, InterruptedException {
 		 dataDup = new  ArrayList<List<Integer>>();
 		 for (int i = 0; i < data.size(); i++)
-			 dataDup.add(new ArrayList<Integer>());
+			 dataDup.add(new ArrayList<Integer>( data.get(i)  ));
 		 
-		 // for each item x, we put it to  items.get(x) transactions 
-		 for (Integer x : items.keySet()) {
-			 for (int i = 0; i < items.get(x); i++) {
-				 // try to put x to a random trasaction
-				 
-				 Integer t;
-				 do {
-					 t = rand.nextInt(data.size());
-				 
-				 } while (dataDup.get(t).contains(x));
+		 long fail = 0;
+		 
+		
+		 // swap count times 
+		 for (long i = 0; i < count; i++) {
+			 // random 2 transactions
+			 int t1 = rand.nextInt(dataDup.size());   
+			 int t2 = rand.nextInt(dataDup.size());
+			 
+			 // random 2 items 
+			 int i1 = rand.nextInt(dataDup.get(t1).size());
+			 int i2 = rand.nextInt(dataDup.get(t2).size());
+			 
+			 Integer itemI1 = dataDup.get(t1).get(i1);
+			 Integer itemI2 = dataDup.get(t2).get(i2);
+			 
 
-				 // add items x to transaction t.
-				 dataDup.get(t).add(x);
-			 }
+			 // if i1 not in t2 and i2 not in t1
+			 if (!dataDup.get(t1).contains(itemI2)) {
+				 if (!dataDup.get(t2).contains(itemI1)) {
+					 // remove i1 in t1 and i2 in t2
+				
+				
+					 
+					 // remove items at position i1 and i2
+					 dataDup.get(t1).remove(i1);
+					 dataDup.get(t2).remove(i2);
+					 
+					 // add items which was at position i1 and i2
+					 dataDup.get(t1).add(itemI2);
+					 dataDup.get(t2).add(itemI1);
+ 
+				 }
+		 	}
+			else {
+					fail ++;
+//					 System.out.println("\n" + i1 + " " + i2 + " " + itemI1 + " " + itemI2);
+//					 System.out.println(dataDup.get(t1));
+//					 System.out.println(dataDup.get(t2));
+				 }			 
 		 }
-		 // now we will try to make sure that new data has the same length
-//		 for (int i = 0; i < dataDup.size(); i++) {
-//			 while (dataDup.get(i).size() < data.get(i).size()) {
-//				 
-//			 }
-//				 
-//		 }
 		 
-
+		 System.out.println("\n\n\n\n" + count + " " + fail );
+		 
+		 
 		 
 		 // output dataDup to HDFS
 		 for (List<Integer> t : dataDup) {
@@ -89,9 +103,11 @@ public class MapDuplicate
 				 s.append(x.toString() + " ");
 			 // remove last space
 			// s.deleteCharAt(s.length()-1);
-			 context.write(new Text(""), new Text(s.toString()));
+			 context.write(NullWritable.get(), new Text(s.toString()));
 		 }
 		 
+		 for (int i = 0; i < 10; i++)
+			 System.out.println(dataDup.get(i));
 	 }
 	 
 	 @Override

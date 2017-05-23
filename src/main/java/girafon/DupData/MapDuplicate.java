@@ -73,7 +73,12 @@ public class MapDuplicate
 			 }
 		 }
 		 // now we will try to make sure that new data has the same length
-		 //??
+//		 for (int i = 0; i < dataDup.size(); i++) {
+//			 while (dataDup.get(i).size() < data.get(i).size()) {
+//				 
+//			 }
+//				 
+//		 }
 		 
 
 		 
